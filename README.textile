@@ -1,0 +1,38 @@
+h1. ZooKeeper top
+
+*Author: "Patrick Hunt":http://people.apache.org/~phunt/* (follow me on "twitter":http://twitter.com/phunt)
+
+h2. Summary
+
+"This project":http://github.com/phunt/zktop provides a unix "top" like utility for ZooKeeper.
+
+h3. What's Apache ZooKeeper?
+
+From the "official site":http://hadoop.apache.org/zookeeper/: "ZooKeeper is a high-performance coordination service for distributed applications."
+
+It exposes common services - such as naming, configuration management, synchronization, and group services - in a simple interface so you don't have to write them from scratch. You can use it off-the-shelf to implement consensus, group management, leader election, and presence protocols.
+
+h2. License
+
+This project is licensed under the Apache License Version 2.0
+
+h2. zktop.py
+
+0) Top line is overall cluster status
+1-n) Lines 1-n are for the n servers
+n+1 and below are for client connections
+
+h3. Usage
+
+<pre>
+./zktop.py --servers "localhost:2181,localhost:2182,localhost:2183"
+</pre>
+
+<pre>
+Usage: zktop.py [options]
+
+Options:
+  -h, --help         show this help message and exit
+  --servers=SERVERS  comma separated list of host:port (default
+                     localhost:2181)
+</pre>
