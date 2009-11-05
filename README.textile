@@ -36,3 +36,20 @@ Options:
   --servers=SERVERS  comma separated list of host:port (default
                      localhost:2181)
 </pre>
+
+h3. Example
+
+<pre>
+Ensemble -- nodecount:10 zxid:1300000001 sessions:4
+
+SERVER           PORT M      OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT
+localhost        2181 F          0       93       92     2      2      7     13
+localhost        2182 F          0       37       36     1      0      0      0
+localhost        2183 L          0       36       35     1      0      0      0
+
+CLIENT           PORT I   QUEUE RECVD  SENT
+127.0.0.1       34705 1       0    56    56
+127.0.0.1       35943 1       0     1     0
+127.0.0.1       33999 1       0     1     0
+127.0.0.1       37988 1       0     1     0
+</pre>
