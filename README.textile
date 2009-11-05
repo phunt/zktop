@@ -48,7 +48,7 @@ Running:
 shows a screen like:
 
 <pre>
-Ensemble -- nodecount:10 zxid:1300000001 sessions:4
+Ensemble -- nodecount:10 zxid:0x1300000001 sessions:4
 
 SERVER           PORT M      OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT
 localhost        2181 F          0       93       92     2      2      7     13

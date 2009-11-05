@@ -131,7 +131,7 @@ class SummaryUI(object):
         nc = max(self.node_counts)
         zxid = max(self.zxids)
         sc = sum(self.session_counts)
-        self.win.addstr(0, 0, "Ensemble -- nodecount:%d zxid:%x sessions:%d" %
+        self.win.addstr(0, 0, "Ensemble -- nodecount:%d zxid:0x%x sessions:%d" %
                         (nc, zxid, sc))
         self.win.noutrefresh()
 
