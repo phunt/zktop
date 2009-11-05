@@ -25,10 +25,6 @@ n+1 and below are for client connections
 h3. Usage
 
 <pre>
-./zktop.py --servers "localhost:2181,localhost:2182,localhost:2183"
-</pre>
-
-<pre>
 Usage: zktop.py [options]
 
 Options:
@@ -37,7 +33,19 @@ Options:
                      localhost:2181)
 </pre>
 
+The screen refreshes every 3 seconds.
+* 'q' quits
+* spacebar updates immediately
+
 h3. Example
+
+Running:
+
+<pre>
+./zktop.py --servers "localhost:2181,localhost:2182,localhost:2183"
+</pre>
+
+shows a screen like:
 
 <pre>
 Ensemble -- nodecount:10 zxid:1300000001 sessions:4
