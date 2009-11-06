@@ -19,18 +19,30 @@
 from optparse import OptionParser
 
 import curses
-import re
-import telnetlib
-import StringIO
-import threading
-import Queue
+import struct
+import os, sys
+import termios, fcntl
+import threading, Queue
+import telnetlib, socket
+import signal
+import re, StringIO
+
+import logging as LOG
+LOG_FILENAME = 'zktop_log.out'
+LOG.basicConfig(filename=LOG_FILENAME,level=LOG.DEBUG)
 
 usage = "usage: %prog [options]"
 parser = OptionParser(usage=usage)
 parser.add_option("", "--servers", dest="servers",
                   default="localhost:2181", help="comma separated list of host:port (default localhost:2181)")
 
+parser.add_option("-n", "--names",
+                  action="store_true", dest="names", default=False,
+                  help="resolve session name from ip (default False)")
+
 (options, args) = parser.parse_args()
+
+resized_sig = False
 
 # threads to get server data
 # UI class
@@ -89,7 +101,14 @@ class ZKServer(object):
 
 
 q_stats = Queue.Queue()
+
 p_wakeup = threading.Condition()
+
+def wakeup_poller():
+    p_wakeup.acquire()
+    p_wakeup.notifyAll()
+    p_wakeup.release()
+
 
 server_id = 0
 class StatPoller(threading.Thread):
@@ -107,13 +126,29 @@ class StatPoller(threading.Thread):
             s.server_id = self.server_id
             q_stats.put(s)
             p_wakeup.wait(3.0)
-        p_wakeup.release()
+        # no need - never hit here except exit - "p_wakeup.release()"
+        # also, causes error on console
 
-class SummaryUI(object):
-    def __init__(self, stdscr, width, server_count):
-        self.width = width
-        self.win = curses.newwin(1, width, 0, 0)
-        self.stdscr = stdscr
+class BaseUI(object):
+    def __init__(self, win):
+        self.win = win
+        global mainwin
+        self.maxy, self.maxx = mainwin.getmaxyx()
+        self.resize(self.maxy, self.maxx)
+        
+    def resize(self, maxy, maxx):
+        LOG.debug("resize called y %d x %d" % (maxy, maxx))
+        self.maxy = maxy
+        self.maxx = maxx
+
+    def addstr(self, y, x, line, flags = 0):
+        LOG.debug("addstr with maxx %d" % (self.maxx))
+        self.win.addstr(y, x, line[:self.maxx-1], flags)
+        self.win.noutrefresh()
+
+class SummaryUI(BaseUI):
+    def __init__(self, height, width, server_count):
+        BaseUI.__init__(self, curses.newwin(1, width, 0, 0))
         self.session_counts = [0 for i in range(server_count)]
         self.node_counts = [0 for i in range(server_count)]
         self.zxids = [0 for i in range(server_count)]
@@ -131,71 +166,72 @@ class SummaryUI(object):
         nc = max(self.node_counts)
         zxid = max(self.zxids)
         sc = sum(self.session_counts)
-        self.win.addstr(0, 0, "Ensemble -- nodecount:%d zxid:0x%x sessions:%d" %
-                        (nc, zxid, sc))
-        self.win.noutrefresh()
+        self.addstr(0, 0, "Ensemble -- nodecount:%d zxid:0x%x sessions:%d" %
+                    (nc, zxid, sc))
 
-class ServerUI(object):
-    def __init__(self, stdscr, width, server_count):
-        self.width = width
-        self.win = curses.newwin(server_count + 2, width, 1, 0)
-        self.win.addstr(1, 0, "SERVER           PORT M      OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
+class ServerUI(BaseUI):
+    def __init__(self, height, width, server_count):
+        BaseUI.__init__(self, curses.newwin(server_count + 2, width, 1, 0))
+
+    def resize(self, maxy, maxx):
+        BaseUI.resize(self, maxy, maxx)
+        self.addstr(1, 0, "SERVER           PORT M    OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
 
     def update(self, s):
         if s.unavailable:
-            self.win.addstr(s.server_id + 2, 0, "%-15s %5s %s" %
-                            (s.host[:15], s.port, s.mode[:1].upper()))
+            self.addstr(s.server_id + 2, 0, "%-15s %5s %s" %
+                        (s.host[:15], s.port, s.mode[:1].upper()))
         else:
-            self.win.addstr(s.server_id + 2, 0, "%-15s %5s %s   %8s %8s %8s %5d %6s %6s %6s" %
-                            (s.host[:15], s.port, s.mode[:1].upper(),
-                             s.outstanding, s.received, s.sent, len(s.sessions),
-                             s.min_latency, s.avg_latency, s.max_latency))
-        self.win.noutrefresh()
+            self.addstr(s.server_id + 2, 0, "%-15s %5s %s %8s %8s %8s %5d %6s %6s %6s" %
+                        (s.host[:15], s.port, s.mode[:1].upper(),
+                         s.outstanding, s.received, s.sent, len(s.sessions),
+                         s.min_latency, s.avg_latency, s.max_latency))
 
-def list_sessions(list_of_session_lists):
-    for l in list_of_session_lists:
-        for session in l:
-            yield session
-    return
-
-class SessionUI(object):
-    def __init__(self, stdscr, width, server_count):
-        self.width = width
-
-        self.win = curses.newwin(20, width, server_count + 3, 0)
+class SessionUI(BaseUI):
+    def __init__(self, height, width, server_count):
+        BaseUI.__init__(self, curses.newwin(height - server_count - 3, width, server_count + 3, 0))
         self.sessions = [[] for i in range(server_count)]
 
     def update(self, s):
         self.win.erase()
-        self.win.addstr(1, 0, "CLIENT           PORT I   QUEUE RECVD  SENT", curses.A_REVERSE)
+        self.addstr(1, 0, "CLIENT           PORT I   QUEUED    RECVD     SENT", curses.A_REVERSE)
         self.sessions[s.server_id] = s.sessions
         items = []
         for l in self.sessions:
             items.extend(l)
+        items.sort(lambda x,y: int(y.queued)-int(x.queued))
         for i, session in enumerate(items):
-            #ugh, handle if slow session.host = socket.getnameinfo((session.host, int(session.port)), 0)[0]
-            self.win.addstr(i + 2, 0, "%-15s %5s %1s   %5s %5s %5s" %
+            try:
+                #ugh, need to handle if slow - thread for async resolver?
+                if options.names:
+                    session.host = socket.getnameinfo((session.host, int(session.port)), 0)[0]
+                self.addstr(i + 2, 0, "%-15s %5s %1s %8s %8s %8s" %
                             (session.host[:15], session.port, session.interest_ops,
                              session.queued, session.recved, session.sent))
-        self.win.noutrefresh()
+            except:
+                break
 
-class UI(object):
+mainwin = None
+class Main(object):
     def __init__(self, servers):
         self.servers = servers.split(",")
 
-    def main(self, stdscr):
+    def show_ui(self, stdscr):
+        global mainwin
+        mainwin = stdscr
+        curses.use_default_colors()
         # w/o this for some reason takes 1 cycle to draw wins
         stdscr.refresh()
 
-        self.stdscr = stdscr
+        signal.signal(signal.SIGWINCH, sigwinch_handler)
 
-        self.max_y, self.max_x = stdscr.getmaxyx()
         stdscr.timeout(250)
 
         server_count = len(self.servers)
-        uis = (SummaryUI(stdscr, self.max_x, server_count),
-               ServerUI(stdscr, self.max_x, server_count),
-               SessionUI(stdscr, self.max_x, server_count))
+        maxy, maxx = stdscr.getmaxyx()
+        uis = (SummaryUI(maxy, maxx, server_count),
+               ServerUI(maxy, maxx, server_count),
+               SessionUI(maxy, maxx, server_count))
 
         # start the polling threads
         pollers = [StatPoller(server) for server in self.servers]
@@ -204,24 +240,26 @@ class UI(object):
             poller.setDaemon(True)
             poller.start()
 
+        LOG.debug("starting main loop")
+        global resized_sig
         while True:
             try:
+                if resized_sig:
+                    resized_sig = False
+                    self.resize(uis)
+                    wakeup_poller()
+
                 while not q_stats.empty():
                     zkserver = q_stats.get_nowait()
-                    try:
-                        for ui in uis:
-                            ui.update(zkserver)
-                    finally:
-                        q_stats.task_done()
+                    for ui in uis:
+                        ui.update(zkserver)
 
                 ch = stdscr.getch()
                 if 0 < ch <=255:
                     if ch == ord('q'):
                         return
                     elif ch == ord(' '):
-                        p_wakeup.acquire()
-                        p_wakeup.notifyAll()
-                        p_wakeup.release()
+                        wakeup_poller()
 
                 stdscr.move(1, 0)
 
@@ -230,6 +268,24 @@ class UI(object):
             except KeyboardInterrupt:
                 break
 
+    def resize(self, uis):
+        curses.endwin()
+        curses.doupdate()
+
+        global mainwin
+        mainwin.refresh()
+        maxy, maxx = mainwin.getmaxyx()
+
+        for ui in uis:
+            ui.resize(maxy, maxx)
+
+def sigwinch_handler(*nada):
+    LOG.debug("sigwinch called")
+    global resized_sig
+    resized_sig = True
+
 if __name__ == '__main__':
-    ui = UI(options.servers)
-    curses.wrapper(ui.main)
+    LOG.debug("startup")
+
+    ui = Main(options.servers)
+    curses.wrapper(ui.show_ui)
