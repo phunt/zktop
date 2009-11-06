@@ -19,9 +19,6 @@
 from optparse import OptionParser
 
 import curses
-import struct
-import os, sys
-import termios, fcntl
 import threading, Queue
 import telnetlib, socket
 import signal
