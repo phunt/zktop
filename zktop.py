@@ -49,17 +49,19 @@ resized_sig = False
 # track current data and historical
 
 class Session(object):
-    def __init__(self, session):
+    def __init__(self, session, server_id):
         m = re.search('/(\d+\.\d+\.\d+\.\d+):(\d+)\[(\d+)\]\((.*)\)', session)
         self.host = m.group(1)
         self.port = m.group(2)
+        self.server_id = server_id
         self.interest_ops = m.group(3)
         for d in m.group(4).split(","):
             k,v = d.split("=")
             self.__dict__[k] = v
 
 class ZKServer(object):
-    def __init__(self, server):
+    def __init__(self, server, server_id):
+        self.server_id = server_id
         self.host, self.port = server.split(':')
         try:
             stat = self.send_cmd('stat\n')
@@ -73,7 +75,7 @@ class ZKServer(object):
             for line in sio:
                 if not line.strip():
                     break
-                self.sessions.append(Session(line.strip()))
+                self.sessions.append(Session(line.strip(), server_id))
             for line in sio:
                 attr, value = line.split(':')
                 attr = attr.strip().replace(" ", "_").replace("/", "_").lower()
@@ -122,8 +124,7 @@ class StatPoller(threading.Thread):
     def run(self):
         p_wakeup.acquire()
         while True:
-            s = ZKServer(self.server)
-            s.server_id = self.server_id
+            s = ZKServer(self.server, self.server_id)
             q_stats.put(s)
             p_wakeup.wait(3.0)
         # no need - never hit here except exit - "p_wakeup.release()"
@@ -175,15 +176,15 @@ class ServerUI(BaseUI):
 
     def resize(self, maxy, maxx):
         BaseUI.resize(self, maxy, maxx)
-        self.addstr(1, 0, "SERVER           PORT M    OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
+        self.addstr(1, 0, "ID SERVER           PORT M    OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
 
     def update(self, s):
         if s.unavailable:
-            self.addstr(s.server_id + 2, 0, "%-15s %5s %s" %
-                        (s.host[:15], s.port, s.mode[:1].upper()))
+            self.addstr(s.server_id + 2, 0, "%-2s %-15s %5s %s" %
+                        (s.server_id, s.host[:15], s.port, s.mode[:1].upper()))
         else:
-            self.addstr(s.server_id + 2, 0, "%-15s %5s %s %8s %8s %8s %5d %6s %6s %6s" %
-                        (s.host[:15], s.port, s.mode[:1].upper(),
+            self.addstr(s.server_id + 2, 0, "%-2s %-15s %5s %s %8s %8s %8s %5d %6s %6s %6s" %
+                        (s.server_id, s.host[:15], s.port, s.mode[:1].upper(),
                          s.outstanding, s.received, s.sent, len(s.sessions),
                          s.min_latency, s.avg_latency, s.max_latency))
 
@@ -194,7 +195,7 @@ class SessionUI(BaseUI):
 
     def update(self, s):
         self.win.erase()
-        self.addstr(1, 0, "CLIENT           PORT I   QUEUED    RECVD     SENT", curses.A_REVERSE)
+        self.addstr(1, 0, "CLIENT           PORT S I   QUEUED    RECVD     SENT", curses.A_REVERSE)
         self.sessions[s.server_id] = s.sessions
         items = []
         for l in self.sessions:
@@ -205,8 +206,8 @@ class SessionUI(BaseUI):
                 #ugh, need to handle if slow - thread for async resolver?
                 if options.names:
                     session.host = socket.getnameinfo((session.host, int(session.port)), 0)[0]
-                self.addstr(i + 2, 0, "%-15s %5s %1s %8s %8s %8s" %
-                            (session.host[:15], session.port, session.interest_ops,
+                self.addstr(i + 2, 0, "%-15s %5s %1s %1s %8s %8s %8s" %
+                            (session.host[:15], session.port, session.server_id, session.interest_ops,
                              session.queued, session.recved, session.sent))
             except:
                 break
