@@ -262,6 +262,9 @@ class Main(object):
                 if 0 < ch <=255:
                     if ch == ord('q'):
                         return
+                    elif ch == ord('h'):
+                        flash = "Help: q:quit r:reset stats spc:refresh"
+                        flash_count = 1000/TIMEOUT * 5
                     elif ch == ord('r'):
                         [reset_server_stats(server) for server in self.servers]
                         flash = "Server stats reset"

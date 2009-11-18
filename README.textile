@@ -56,6 +56,7 @@ Options:
 </pre>
 
 The screen refreshes every 3 seconds.
+* 'h' help
 * 'q' quits
 * 'r' resets the server stats
 * spacebar updates immediately
