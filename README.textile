@@ -6,43 +6,12 @@ h2. Summary
 
 "This project":http://github.com/phunt/zktop provides a unix "top" like utility for ZooKeeper.
 
-h3. What's Apache ZooKeeper?
-
-From the "official site":http://hadoop.apache.org/zookeeper/: "ZooKeeper is a high-performance coordination service for distributed applications."
-
-It exposes common services - such as naming, configuration management, synchronization, and group services - in a simple interface so you don't have to write them from scratch. You can use it off-the-shelf to implement consensus, group management, leader election, and presence protocols.
-
-h2. License
-
-This project is licensed under the Apache License Version 2.0
-
-h2. zktop.py
-
-0) Top line is overall cluster status
-1-n) Lines 1-n are for the n servers
-n+1 and below are for client connections
-
-h3. Usage
-
-<pre>
-Usage: zktop.py [options]
-
-Options:
-  -h, --help         show this help message and exit
-  --servers=SERVERS  comma separated list of host:port (default
-                     localhost:2181)
-</pre>
-
-The screen refreshes every 3 seconds.
-* 'q' quits
-* spacebar updates immediately
-
 h3. Example
 
 Running:
 
 <pre>
-./zktop.py --servers "localhost:2181,localhost:2182,localhost:2183"
+./zktop.py --servers "localhost:2181,localhost:2182,localhost:2183" -n
 </pre>
 
 shows a screen like:
@@ -61,3 +30,36 @@ CLIENT           PORT I   QUEUE RECVD  SENT
 127.0.0.1       33999 1       0     1     0
 127.0.0.1       37988 1       0     1     0
 </pre>
+
+h3. What's Apache ZooKeeper?
+
+From the "official site":http://hadoop.apache.org/zookeeper/: "ZooKeeper is a high-performance coordination service for distributed applications."
+
+It exposes common services - such as naming, configuration management, synchronization, and group services - in a simple interface so you don't have to write them from scratch. You can use it off-the-shelf to implement consensus, group management, leader election, and presence protocols.
+
+h2. zktop.py
+
+0) Top line is overall cluster status
+1-n) Lines 1-n are for the n servers
+n+1 and below are for client connections
+
+h3. Usage
+
+<pre>
+Usage: zktop.py [options]
+
+Options:
+  -h, --help         show this help message and exit
+  --servers=SERVERS  comma separated list of host:port (default
+                     localhost:2181)
+  -n, --names        resolve session name from ip (default False)
+</pre>
+
+The screen refreshes every 3 seconds.
+* 'q' quits
+* 'r' resets the server stats
+* spacebar updates immediately
+
+h2. License
+
+This project is licensed under the Apache License Version 2.0

@@ -61,7 +61,7 @@ class ZKServer(object):
         self.server_id = server_id
         self.host, self.port = server.split(':')
         try:
-            stat = self.send_cmd('stat\n')
+            stat = send_cmd(self.host, self.port, 'stat\n')
 
             sio = StringIO.StringIO(stat)
             line = sio.readline()
@@ -88,15 +88,15 @@ class ZKServer(object):
             self.version = "Unknown"
             return
 
-    def send_cmd(self, cmd):
-        tn = telnetlib.Telnet(self.host, self.port)
+def send_cmd(host, port, cmd):
+    tn = telnetlib.Telnet(host, port)
 
-        tn.write(cmd)
+    tn.write(cmd)
 
-        result = tn.read_all()
-        tn.close()
+    result = tn.read_all()
+    tn.close()
 
-        return result
+    return result
 
 
 q_stats = Queue.Queue()
@@ -108,6 +108,9 @@ def wakeup_poller():
     p_wakeup.notifyAll()
     p_wakeup.release()
 
+def reset_server_stats(server):
+    host, port = server.split(':')
+    send_cmd(host, port, "srst\n")
 
 server_id = 0
 class StatPoller(threading.Thread):
@@ -142,6 +145,7 @@ class BaseUI(object):
     def addstr(self, y, x, line, flags = 0):
         LOG.debug("addstr with maxx %d" % (self.maxx))
         self.win.addstr(y, x, line[:self.maxx-1], flags)
+        self.win.clrtoeol()
         self.win.noutrefresh()
 
 class SummaryUI(BaseUI):
@@ -223,7 +227,8 @@ class Main(object):
 
         signal.signal(signal.SIGWINCH, sigwinch_handler)
 
-        stdscr.timeout(250)
+        TIMEOUT = 250
+        stdscr.timeout(TIMEOUT)
 
         server_count = len(self.servers)
         maxy, maxx = stdscr.getmaxyx()
@@ -240,6 +245,7 @@ class Main(object):
 
         LOG.debug("starting main loop")
         global resized_sig
+        flash = None
         while True:
             try:
                 if resized_sig:
@@ -256,10 +262,21 @@ class Main(object):
                 if 0 < ch <=255:
                     if ch == ord('q'):
                         return
+                    elif ch == ord('r'):
+                        [reset_server_stats(server) for server in self.servers]
+                        flash = "Server stats reset"
+                        flash_count = 1000/TIMEOUT * 5
+                        wakeup_poller()
                     elif ch == ord(' '):
                         wakeup_poller()
 
                 stdscr.move(1, 0)
+                if flash:
+                    stdscr.addstr(1, 0, flash)
+                    flash_count -= 1
+                    if flash_count == 0:
+                        flash = None
+                stdscr.clrtoeol()
 
                 curses.doupdate()
 
