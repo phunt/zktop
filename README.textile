@@ -11,7 +11,7 @@ h3. Example
 Running:
 
 <pre>
-./zktop.py --servers "localhost:2181,localhost:2182,localhost:2183" -n
+./zktop.py --servers "localhost:2181,localhost:2182,localhost:2183"
 </pre>
 
 shows a screen like:
