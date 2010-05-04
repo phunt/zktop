@@ -20,7 +20,7 @@ from optparse import OptionParser
 
 import curses
 import threading, Queue
-import telnetlib, socket
+import socket
 import signal
 import re, StringIO
 
@@ -36,6 +36,9 @@ parser.add_option("", "--servers", dest="servers",
 parser.add_option("-n", "--names",
                   action="store_true", dest="names", default=False,
                   help="resolve session name from ip (default False)")
+parser.add_option("", "--fix_330",
+                  action="store_true", dest="fix_330", default=False,
+                  help="workaround for a bug in ZK 3.3.0")
 
 (options, args) = parser.parse_args()
 
@@ -47,7 +50,8 @@ resized_sig = False
 
 class Session(object):
     def __init__(self, session, server_id):
-        m = re.search('/(\d+\.\d+\.\d+\.\d+):(\d+)\[(\d+)\]\((.*)\)', session)
+        # allow both ipv4 and ipv6 addresses
+        m = re.search('/([\da-fA-F:\.]+):(\d+)\[(\d+)\]\((.*)\)', session)
         self.host = m.group(1)
         self.port = m.group(2)
         self.server_id = server_id
@@ -89,15 +93,26 @@ class ZKServer(object):
             return
 
 def send_cmd(host, port, cmd):
-    tn = telnetlib.Telnet(host, port)
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect((host, int(port)))
+    result = []
+    try:
+        s.sendall(cmd)
 
-    tn.write(cmd)
+        # shutting down the socket write side helps ensure
+        # that we don't end up with TIME_WAIT sockets
+        if not options.fix_330:
+            s.shutdown(socket.SHUT_WR)
 
-    result = tn.read_all()
-    tn.close()
+        while True:
+            data = s.recv(4096)
+            if not data:
+                break
+            result.append(data)
+    finally:
+        s.close()
 
-    return result
-
+    return "".join(result)
 
 q_stats = Queue.Queue()
 
