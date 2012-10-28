@@ -23,24 +23,35 @@ import threading, Queue
 import socket
 import signal
 import re, StringIO
-
 import logging as LOG
-LOG_FILENAME = 'zktop_log.out'
-LOG.basicConfig(filename=LOG_FILENAME,level=LOG.DEBUG)
 
 usage = "usage: %prog [options]"
 parser = OptionParser(usage=usage)
-parser.add_option("", "--servers", dest="servers",
-                  default="localhost:2181", help="comma separated list of host:port (default localhost:2181)")
-
+parser.add_option("", "--servers",
+                  dest="servers", default="localhost:2181",
+                  help="comma separated list of host:port (default localhost:2181)")
 parser.add_option("-n", "--names",
                   action="store_true", dest="names", default=False,
                   help="resolve session name from ip (default False)")
 parser.add_option("", "--fix_330",
                   action="store_true", dest="fix_330", default=False,
                   help="workaround for a bug in ZK 3.3.0")
+parser.add_option("-v", "--verbosity",
+                  dest="verbosity", default="DEBUG",
+                  help="log level verbosity")
+parser.add_option("-l", "--logfile",
+                  dest="logfile", default=None,
+                  help="directory in which to place log file, or empty for none")
+parser.add_option("-c", "--config",
+                  dest="configfile", default=None,
+                  help="zookeeper configuration file to lookup servers from")
 
 (options, args) = parser.parse_args()
+
+if options.logfile:
+    LOG.basicConfig(filename=options.logfile, level=getattr(LOG, options.verbosity))
+else:
+    LOG.disable(LOG.CRITICAL)
 
 resized_sig = False
 
@@ -317,8 +328,22 @@ def sigwinch_handler(*nada):
     global resized_sig
     resized_sig = True
 
+def read_zk_config(filename):
+    with open(filename) as f:
+        config = dict(tuple(line.rstrip().split('=', 1)) for line in f if line.rstrip())
+        return config
+
+def get_zk_servers(filename):
+    if filename:
+        config = read_zk_config(options.configfile)
+        client_port = config['clientPort']
+        return ','.join("%s:%s" % (v.split(':', 1)[0], client_port)
+                        for k, v in config.items() if k.startswith('server.'))
+    else:
+        return options.servers
+
 if __name__ == '__main__':
     LOG.debug("startup")
 
-    ui = Main(options.servers)
+    ui = Main(get_zk_servers(options.configfile))
     curses.wrapper(ui.show_ui)
