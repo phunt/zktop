@@ -69,7 +69,7 @@ class Session(object):
         self.interest_ops = m.group(3)
         for d in m.group(4).split(","):
             k,v = d.split("=")
-            self.__dict__[k] = v
+            setattr(self, k, v)
 
 class ZKServer(object):
     def __init__(self, server, server_id):
@@ -91,7 +91,7 @@ class ZKServer(object):
             for line in sio:
                 attr, value = line.split(':')
                 attr = attr.strip().replace(" ", "_").replace("/", "_").lower()
-                self.__dict__[attr] = value.strip()
+                setattr(self, attr, value.strip())
 
             self.min_latency, self.avg_latency, self.max_latency = self.latency_min_avg_max.split("/")
 
