@@ -329,8 +329,11 @@ def sigwinch_handler(*nada):
     resized_sig = True
 
 def read_zk_config(filename):
-    with open(filename) as f:
+    f = open(filename, 'r')
+    try:
         config = dict(tuple(line.rstrip().split('=', 1)) for line in f if line.rstrip())
+    finally:
+        f.close()
         return config
 
 def get_zk_servers(filename):
