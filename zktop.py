@@ -45,6 +45,9 @@ parser.add_option("-l", "--logfile",
 parser.add_option("-c", "--config",
                   dest="configfile", default=None,
                   help="zookeeper configuration file to lookup servers from")
+parser.add_option("-t", "--timeout",
+                  dest="timeout", default=None,
+                  help="connection timeout to zookeeper instance")
 
 (options, args) = parser.parse_args()
 
@@ -105,6 +108,8 @@ class ZKServer(object):
 
 def send_cmd(host, port, cmd):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if options.timeout:
+        s.settimeout(float(options.timeout))
     s.connect((host, int(port)))
     result = []
     try:
