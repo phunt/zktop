@@ -329,9 +329,15 @@ def sigwinch_handler(*nada):
     resized_sig = True
 
 def read_zk_config(filename):
+    config = {}
     f = open(filename, 'r')
     try:
-        config = dict(tuple(line.rstrip().split('=', 1)) for line in f if line.rstrip())
+        for line in f:
+            if line.rstrip() and not line.startswith('#'):
+                k,v = tuple(line.replace(' ', '').strip().split('=', 1))
+                config[k] = v
+    except IOError as e:
+        print "Unable to open `{0}': I/O error({1}): {2}".format(filename, e.errno, e.strerror)
     finally:
         f.close()
         return config
