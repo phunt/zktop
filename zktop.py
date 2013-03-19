@@ -25,10 +25,12 @@ import signal
 import re, StringIO
 import logging as LOG
 
+ZK_DEFAULT_PORT = 2181
+
 usage = "usage: %prog [options]"
 parser = OptionParser(usage=usage)
 parser.add_option("", "--servers",
-                  dest="servers", default="localhost:2181",
+                  dest="servers", default="localhost:%s" % ZK_DEFAULT_PORT,
                   help="comma separated list of host:port (default localhost:2181)")
 parser.add_option("-n", "--names",
                   action="store_true", dest="names", default=False,
@@ -348,7 +350,8 @@ def get_zk_servers(filename):
         return ','.join("%s:%s" % (v.split(':', 1)[0], client_port)
                         for k, v in config.items() if k.startswith('server.'))
     else:
-        return options.servers
+        return ','.join("%s:%s" % (s.strip(), ZK_DEFAULT_PORT) if not ':' in s else "%s" % s
+                        for s in options.servers.split(',', 1))
 
 if __name__ == '__main__':
     LOG.debug("startup")
