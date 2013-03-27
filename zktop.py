@@ -38,7 +38,7 @@ parser.add_option("", "--fix_330",
                   help="workaround for a bug in ZK 3.3.0")
 parser.add_option("-v", "--verbosity",
                   dest="verbosity", default="DEBUG",
-                  help="log level verbosity")
+                  help="log level verbosity (DEBUG, INFO, WARN(ING), ERROR, CRITICAL/FATAL)")
 parser.add_option("-l", "--logfile",
                   dest="logfile", default=None,
                   help="directory in which to place log file, or empty for none")
