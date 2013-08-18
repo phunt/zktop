@@ -299,7 +299,12 @@ class Main(object):
                         flash = "Help: q:quit r:reset stats spc:refresh"
                         flash_count = 1000/TIMEOUT * 5
                     elif ch == ord('r'):
-                        [reset_server_stats(server) for server in self.servers]
+                        for server in self.servers:
+                            try:
+                                reset_server_stats(server)
+                            except:
+                              pass
+
                         flash = "Server stats reset"
                         flash_count = 1000/TIMEOUT * 5
                         wakeup_poller()
