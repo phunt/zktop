@@ -61,7 +61,7 @@ Options:
   -n, --names           resolve session name from ip (default False)
   --fix_330             workaround for a bug in ZK 3.3.0
   -v VERBOSITY, --verbosity=VERBOSITY
-                        log level verbosity
+                        log level verbosity (DEBUG, INFO, WARN(ING), ERROR, CRITICAL/FATAL))
   -l LOGFILE, --logfile=LOGFILE
                         directory in which to place log file, or empty for
                         none
