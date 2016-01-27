@@ -28,7 +28,7 @@ import socket
 import signal
 import re
 try:
-    import StringIo
+    import StringIO
 except ImportError:  # py3
     from io import StringIO
 import logging as LOG
