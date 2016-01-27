@@ -226,6 +226,13 @@ class SessionUI(BaseUI):
     def __init__(self, height, width, server_count):
         BaseUI.__init__(self, curses.newwin(height - server_count - 3, width, server_count + 3, 0))
         self.sessions = [[] for i in range(server_count)]
+        self.ip_to_hostname = {}
+
+    def hostname(self, session):
+        if session.host not in self.ip_to_hostname:
+            hostname = socket.getnameinfo((session.host, int(session.port)), 0)[0]
+            self.ip_to_hostname[session.host] = hostname
+        return self.ip_to_hostname[session.host]
 
     def update(self, s):
         self.win.erase()
@@ -238,10 +245,9 @@ class SessionUI(BaseUI):
         for i, session in enumerate(items):
             try:
                 #ugh, need to handle if slow - thread for async resolver?
-                if options.names:
-                    session.host = socket.getnameinfo((session.host, int(session.port)), 0)[0]
+                host = self.hostname(session) if options.names else session.host
                 self.addstr(i + 2, 0, "%-15s %5s %1s %1s %8s %8s %8s" %
-                            (session.host[:15], session.port, session.server_id, session.interest_ops,
+                            (host[:15], session.port, session.server_id, session.interest_ops,
                              session.queued, session.recved, session.sent))
             except:
                 break
