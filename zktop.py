@@ -28,7 +28,7 @@ import socket
 import signal
 import re
 try:
-    import StringIO
+    from StringIO import StringIO
 except ImportError:  # py3
     from io import StringIO
 import logging as LOG
@@ -68,6 +68,12 @@ else:
 
 resized_sig = False
 
+def strToLong(str, base):
+    try:
+        return long(str, base)
+    except: # py3
+        return int(str, base)
+
 # threads to get server data
 # UI class
 # track current data and historical
@@ -89,9 +95,9 @@ class ZKServer(object):
         self.server_id = server_id
         self.host, self.port = server.split(':')
         try:
-            stat = send_cmd(self.host, self.port, 'stat\n')
+            stat = send_cmd(self.host, self.port, b'stat\n')
 
-            sio = StringIO.StringIO(stat)
+            sio = StringIO(stat)
             line = sio.readline()
             m = re.search('.*: (\d+\.\d+\.\d+)-.*', line)
             self.version = m.group(1)
@@ -134,6 +140,8 @@ def send_cmd(host, port, cmd):
             data = s.recv(4096)
             if not data:
                 break
+
+            data = data.decode()
             result.append(data)
     finally:
         s.close()
@@ -151,7 +159,7 @@ def wakeup_poller():
 
 def reset_server_stats(server):
     host, port = server.split(':')
-    send_cmd(host, port, "srst\n")
+    send_cmd(host, port, b'srst\n')
 
 server_id = 0
 class StatPoller(threading.Thread):
@@ -205,7 +213,7 @@ class SummaryUI(BaseUI):
         else:
             self.session_counts[s.server_id] = len(s.sessions)
             self.node_counts[s.server_id] = int(s.node_count)
-            self.zxids[s.server_id] = long(s.zxid, 16)
+            self.zxids[s.server_id] = strToLong(s.zxid, 16)
         nc = max(self.node_counts)
         zxid = max(self.zxids)
         sc = sum(self.session_counts)
