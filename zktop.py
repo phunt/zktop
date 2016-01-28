@@ -19,10 +19,18 @@
 from optparse import OptionParser
 
 import curses
-import threading, Queue
+import threading
+try:
+    import Queue
+except ImportError:  # py3
+    import queue as Queue
 import socket
 import signal
-import re, StringIO
+import re
+try:
+    import StringIo
+except ImportError:  # py3
+    from io import StringIO
 import logging as LOG
 
 ZK_DEFAULT_PORT = 2181
@@ -169,7 +177,7 @@ class BaseUI(object):
         global mainwin
         self.maxy, self.maxx = mainwin.getmaxyx()
         self.resize(self.maxy, self.maxx)
-        
+
     def resize(self, maxy, maxx):
         LOG.debug("resize called y %d x %d" % (maxy, maxx))
         self.maxy = maxy
@@ -241,7 +249,7 @@ class SessionUI(BaseUI):
         items = []
         for l in self.sessions:
             items.extend(l)
-        items.sort(lambda x,y: int(y.queued)-int(x.queued))
+        items.sort(key=lambda x: int(x.queued), reverse=True)
         for i, session in enumerate(items):
             try:
                 #ugh, need to handle if slow - thread for async resolver?
@@ -278,7 +286,7 @@ class Main(object):
         # start the polling threads
         pollers = [StatPoller(server) for server in self.servers]
         for poller in pollers:
-            poller.setName("PollerThread:" + server)
+            poller.setName("PollerThread:" + poller.server)
             poller.setDaemon(True)
             poller.start()
 
@@ -355,7 +363,7 @@ def read_zk_config(filename):
                 k,v = tuple(line.replace(' ', '').strip().split('=', 1))
                 config[k] = v
     except IOError as e:
-        print "Unable to open `{0}': I/O error({1}): {2}".format(filename, e.errno, e.strerror)
+        print("Unable to open `{0}': I/O error({1}): {2}".format(filename, e.errno, e.strerror))
     finally:
         f.close()
         return config
