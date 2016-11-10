@@ -16,22 +16,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from optparse import OptionParser
+from optparse import OptionParser # TODO use argparse instead
 
-import curses
 import threading
-try:
+import sys
+if sys.version_info.major == 2:
     import Queue
-except ImportError:  # py3
+    from StringIO import StringIO
+else: # Python 3
     import queue as Queue
+    from io import StringIO
 import socket
 import signal
 import re
-try:
-    from StringIO import StringIO
-except ImportError:  # py3
-    from io import StringIO
 import logging as LOG
+if sys.platform == 'win32':
+  print("Cannot run natively on Windows due to missing curses package. Try running in a cygwin shell instead!"); sys.exit(1)
+import curses
+    
 
 ZK_DEFAULT_PORT = 2181
 
@@ -39,7 +41,7 @@ usage = "usage: %prog [options]"
 parser = OptionParser(usage=usage)
 parser.add_option("", "--servers",
                   dest="servers", default="localhost:%s" % ZK_DEFAULT_PORT,
-                  help="comma separated list of host:port (default localhost:2181)")
+                  help="comma separated list of host:port (default localhost:%d)" % ZK_DEFAULT_PORT)
 parser.add_option("-n", "--names",
                   action="store_true", dest="names", default=False,
                   help="resolve session name from ip (default False)")
@@ -68,11 +70,11 @@ else:
 
 resized_sig = False
 
-def strToLong(str, base):
-    try:
-        return long(str, base)
-    except: # py3
-        return int(str, base)
+def strToLong(str, base = 10):
+    ''' Converts string into integer.
+        TODO: remove, is used only once in the entire code.
+    '''
+    return (long if sys.platform.major == 2 else int)(str, base)
 
 # threads to get server data
 # UI class
@@ -93,14 +95,14 @@ class Session(object):
 class ZKServer(object):
     def __init__(self, server, server_id):
         self.server_id = server_id
-        self.host, self.port = server.split(':')
+        self.host, self.port = server.split(':') if ':' in server else (server, ZK_DEFAULT_PORT) # fallback to default if user doesn't specify port number
         try:
-            stat = send_cmd(self.host, self.port, b'stat\n')
+            stat = send_cmd(self.host, int(self.port), b'stat\n')
 
             sio = StringIO(stat)
             line = sio.readline()
-            m = re.search('.*: (\d+\.\d+\.\d+)-.*', line)
-            self.version = m.group(1)
+            m = re.search('.*: (\d+\.\d+\.\d+)-.*', line) # e.g. nodecount:0 zxid:0x0 sessions:0o att
+            self.version = m.group(1) # this will raise an Exception when stat response was empty (because not reponse from server)
             sio.readline()
             self.sessions = []
             for line in sio:
@@ -115,7 +117,7 @@ class ZKServer(object):
             self.min_latency, self.avg_latency, self.max_latency = self.latency_min_avg_max.split("/")
 
             self.unavailable = False
-        except:
+        except: # Exception raised, e.g., when server responds with '' for any reason (not reachable)
             self.unavailable = True
             self.mode = "Unavailable"
             self.sessions = []
@@ -126,13 +128,12 @@ def send_cmd(host, port, cmd):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     if options.timeout:
         s.settimeout(float(options.timeout))
-    s.connect((host, int(port)))
+    s.connect((host, port))
     result = []
     try:
         s.sendall(cmd)
 
-        # shutting down the socket write side helps ensure
-        # that we don't end up with TIME_WAIT sockets
+        # shutting down the socket write side helps ensure that we don't end up with TIME_WAIT sockets
         if not options.fix_330:
             s.shutdown(socket.SHUT_WR)
 
@@ -314,7 +315,7 @@ class Main(object):
                         ui.update(zkserver)
 
                 ch = stdscr.getch()
-                if 0 < ch <=255:
+                if 0 < ch <= 255:
                     if ch == ord('q'):
                         return
                     elif ch == ord('h'):
@@ -388,6 +389,5 @@ def get_zk_servers(filename):
 
 if __name__ == '__main__':
     LOG.debug("startup")
-
     ui = Main(get_zk_servers(options.configfile))
     curses.wrapper(ui.show_ui)
