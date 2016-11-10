@@ -141,7 +141,6 @@ def send_cmd(host, port, cmd):
             data = s.recv(4096)
             if not data:
                 break
-
             data = data.decode()
             result.append(data)
     finally:
@@ -369,7 +368,7 @@ def read_zk_config(filename):
     try:
         for line in f:
             if line.rstrip() and not line.startswith('#'):
-                k,v = tuple(line.replace(' ', '').strip().split('=', 1))
+                k, v = tuple(line.replace(' ', '').strip().split('=', 1))
                 config[k] = v
     except IOError as e:
         print("Unable to open `{0}': I/O error({1}): {2}".format(filename, e.errno, e.strerror))
@@ -381,11 +380,9 @@ def get_zk_servers(filename):
     if filename:
         config = read_zk_config(options.configfile)
         client_port = config['clientPort']
-        return ','.join("%s:%s" % (v.split(':', 1)[0], client_port)
-                        for k, v in config.items() if k.startswith('server.'))
+        return ','.join("%s:%s" % (v.split(':', 1)[0], client_port) for k, v in config.items() if k.startswith('server.'))
     else:
-        return ','.join("%s:%s" % (s.strip(), ZK_DEFAULT_PORT) if not ':' in s else "%s" % s
-                        for s in options.servers.split(',', 1))
+        return ','.join("%s:%s" % (s.strip(), ZK_DEFAULT_PORT) if not ':' in s else "%s" % s for s in options.servers.split(',', 1))
 
 if __name__ == '__main__':
     LOG.debug("startup")
