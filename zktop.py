@@ -23,9 +23,11 @@ import sys
 if sys.version_info.major == 2:
     import Queue
     from StringIO import StringIO
+    strToLong = lambda str, base = 10: long(str, base)
 else: # Python 3
     import queue as Queue
     from io import StringIO
+    strToLong = lambda str, base = 10: int(str, base)
 import socket
 import signal
 import re
@@ -70,11 +72,6 @@ else:
 
 resized_sig = False
 
-def strToLong(str, base = 10):
-    ''' Converts string into integer.
-        TODO: remove, is used only once in the entire code.
-    '''
-    return (long if sys.platform.major == 2 else int)(str, base)
 
 # threads to get server data
 # UI class
@@ -95,14 +92,17 @@ class Session(object):
 class ZKServer(object):
     def __init__(self, server, server_id):
         self.server_id = server_id
-        self.host, self.port = server.split(':') if ':' in server else (server, ZK_DEFAULT_PORT) # fallback to default if user doesn't specify port number
+        if ':' in server:
+            self.host, self.port = server.split(':')[0], int(server.split(':')[1])
+        else: # fallback to default if user doesn't specify port number
+            self.host, self.port = server, ZK_DEFAULT_PORT
         try:
-            stat = send_cmd(self.host, int(self.port), b'stat\n')
+            stat = send_cmd(self.host, self.port, b'stat\n')
 
             sio = StringIO(stat)
             line = sio.readline()
             m = re.search('.*: (\d+\.\d+\.\d+)-.*', line) # e.g. nodecount:0 zxid:0x0 sessions:0o att
-            self.version = m.group(1) # this will raise an Exception when stat response was empty (because not reponse from server)
+            self.version = m.group(1) # raise Exception when stat response empty
             sio.readline()
             self.sessions = []
             for line in sio:
@@ -117,7 +117,7 @@ class ZKServer(object):
             self.min_latency, self.avg_latency, self.max_latency = self.latency_min_avg_max.split("/")
 
             self.unavailable = False
-        except: # Exception raised, e.g., when server responds with '' for any reason (not reachable)
+        except: # e.g., when server responds with '' (not reachable)
             self.unavailable = True
             self.mode = "Unavailable"
             self.sessions = []
