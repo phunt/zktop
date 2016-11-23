@@ -16,22 +16,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from optparse import OptionParser
+from optparse import OptionParser # TODO use argparse instead
 
-import curses
 import threading
-try:
+import sys
+if sys.version_info.major == 2:
     import Queue
-except ImportError:  # py3
+    from StringIO import StringIO
+    strToLong = lambda str, base = 10: long(str, base)
+else: # Python 3
     import queue as Queue
+    from io import StringIO
+    strToLong = lambda str, base = 10: int(str, base)
 import socket
 import signal
 import re
-try:
-    from StringIO import StringIO
-except ImportError:  # py3
-    from io import StringIO
 import logging as LOG
+if sys.platform == 'win32':
+  print("Cannot run natively on Windows due to missing curses package. Try running in a cygwin shell instead!"); sys.exit(1)
+import curses
+    
 
 ZK_DEFAULT_PORT = 2181
 
@@ -39,7 +43,7 @@ usage = "usage: %prog [options]"
 parser = OptionParser(usage=usage)
 parser.add_option("", "--servers",
                   dest="servers", default="localhost:%s" % ZK_DEFAULT_PORT,
-                  help="comma separated list of host:port (default localhost:2181)")
+                  help="comma separated list of host:port (default localhost:%d)" % ZK_DEFAULT_PORT)
 parser.add_option("-n", "--names",
                   action="store_true", dest="names", default=False,
                   help="resolve session name from ip (default False)")
@@ -68,11 +72,6 @@ else:
 
 resized_sig = False
 
-def strToLong(str, base):
-    try:
-        return long(str, base)
-    except: # py3
-        return int(str, base)
 
 # threads to get server data
 # UI class
@@ -93,14 +92,17 @@ class Session(object):
 class ZKServer(object):
     def __init__(self, server, server_id):
         self.server_id = server_id
-        self.host, self.port = server.split(':')
+        if ':' in server:
+            self.host, self.port = server.split(':')[0], int(server.split(':')[1])
+        else: # fallback to default if user doesn't specify port number
+            self.host, self.port = server, ZK_DEFAULT_PORT
         try:
             stat = send_cmd(self.host, self.port, b'stat\n')
 
             sio = StringIO(stat)
             line = sio.readline()
-            m = re.search('.*: (\d+\.\d+\.\d+)-.*', line)
-            self.version = m.group(1)
+            m = re.search('.*: (\d+\.\d+\.\d+)-.*', line) # e.g. nodecount:0 zxid:0x0 sessions:0o att
+            self.version = m.group(1) # raise Exception when stat response empty
             sio.readline()
             self.sessions = []
             for line in sio:
@@ -115,7 +117,7 @@ class ZKServer(object):
             self.min_latency, self.avg_latency, self.max_latency = self.latency_min_avg_max.split("/")
 
             self.unavailable = False
-        except:
+        except: # e.g., when server responds with '' (not reachable)
             self.unavailable = True
             self.mode = "Unavailable"
             self.sessions = []
@@ -126,13 +128,12 @@ def send_cmd(host, port, cmd):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     if options.timeout:
         s.settimeout(float(options.timeout))
-    s.connect((host, int(port)))
+    s.connect((host, port))
     result = []
     try:
         s.sendall(cmd)
 
-        # shutting down the socket write side helps ensure
-        # that we don't end up with TIME_WAIT sockets
+        # shutting down the socket write side helps ensure that we don't end up with TIME_WAIT sockets
         if not options.fix_330:
             s.shutdown(socket.SHUT_WR)
 
@@ -140,7 +141,6 @@ def send_cmd(host, port, cmd):
             data = s.recv(4096)
             if not data:
                 break
-
             data = data.decode()
             result.append(data)
     finally:
@@ -314,7 +314,7 @@ class Main(object):
                         ui.update(zkserver)
 
                 ch = stdscr.getch()
-                if 0 < ch <=255:
+                if 0 < ch <= 255:
                     if ch == ord('q'):
                         return
                     elif ch == ord('h'):
@@ -368,7 +368,7 @@ def read_zk_config(filename):
     try:
         for line in f:
             if line.rstrip() and not line.startswith('#'):
-                k,v = tuple(line.replace(' ', '').strip().split('=', 1))
+                k, v = tuple(line.replace(' ', '').strip().split('=', 1))
                 config[k] = v
     except IOError as e:
         print("Unable to open `{0}': I/O error({1}): {2}".format(filename, e.errno, e.strerror))
@@ -380,14 +380,11 @@ def get_zk_servers(filename):
     if filename:
         config = read_zk_config(options.configfile)
         client_port = config['clientPort']
-        return ','.join("%s:%s" % (v.split(':', 1)[0], client_port)
-                        for k, v in config.items() if k.startswith('server.'))
+        return ','.join("%s:%s" % (v.split(':', 1)[0], client_port) for k, v in config.items() if k.startswith('server.'))
     else:
-        return ','.join("%s:%s" % (s.strip(), ZK_DEFAULT_PORT) if not ':' in s else "%s" % s
-                        for s in options.servers.split(',', 1))
+        return ','.join("%s:%s" % (s.strip(), ZK_DEFAULT_PORT) if not ':' in s else "%s" % s for s in options.servers.split(',', 1))
 
 if __name__ == '__main__':
     LOG.debug("startup")
-
     ui = Main(get_zk_servers(options.configfile))
     curses.wrapper(ui.show_ui)
