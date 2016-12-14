@@ -20,7 +20,10 @@ from optparse import OptionParser # TODO use argparse instead
 
 import threading
 import sys
-if sys.version_info.major == 2:
+
+IS_PYTHON2 = sys.version_info[0] == 2
+
+if IS_PYTHON2:
     import Queue
     from StringIO import StringIO
     strToLong = lambda str, base = 10: long(str, base)
