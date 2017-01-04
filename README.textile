@@ -4,7 +4,7 @@ h1. ZooKeeper top
 
 h2. Summary
 
-"This project":http://github.com/phunt/zktop provides a unix "top" like utility for ZooKeeper.
+"This project":http://github.com/phunt/zktop provides a unix "top" like utility for ZooKeeper. It is compatible with Python2.6, Python2.7 and Python3.
 
 h3. Example
 
