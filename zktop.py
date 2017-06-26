@@ -387,7 +387,10 @@ def get_zk_servers(filename):
     else:
         return ','.join("%s:%s" % (s.strip(), ZK_DEFAULT_PORT) if not ':' in s else "%s" % s for s in options.servers.split(',', 1))
 
-if __name__ == '__main__':
+def main_func():
     LOG.debug("startup")
     ui = Main(get_zk_servers(options.configfile))
     curses.wrapper(ui.show_ui)
+    
+if __name__ == '__main__':
+    main_func()
