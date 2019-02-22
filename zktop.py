@@ -229,15 +229,15 @@ class ServerUI(BaseUI):
 
     def resize(self, maxy, maxx):
         BaseUI.resize(self, maxy, maxx)
-        self.addstr(1, 0, "ID SERVER           PORT M    OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
+        self.addstr(1, 0, "ID SERVER                          PORT M    OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
 
     def update(self, s):
         if s.unavailable:
-            self.addstr(s.server_id + 2, 0, "%-2s %-15s %5s %s" %
-                        (s.server_id, s.host[:15], s.port, s.mode[:1].upper()))
+            self.addstr(s.server_id + 2, 0, "%-2s %-30s %5s %s" %
+                        (s.server_id, s.host[:30], s.port, s.mode[:1].upper()))
         else:
-            self.addstr(s.server_id + 2, 0, "%-2s %-15s %5s %s %8s %8s %8s %5d %6s %6s %6s" %
-                        (s.server_id, s.host[:15], s.port, s.mode[:1].upper(),
+            self.addstr(s.server_id + 2, 0, "%-2s %-30s %5s %s %8s %8s %8s %5d %6s %6s %6s" %
+                        (s.server_id, s.host[:30], s.port, s.mode[:1].upper(),
                          s.outstanding, s.received, s.sent, len(s.sessions),
                          s.min_latency, s.avg_latency, s.max_latency))
 
@@ -255,7 +255,7 @@ class SessionUI(BaseUI):
 
     def update(self, s):
         self.win.erase()
-        self.addstr(1, 0, "CLIENT           PORT S I   QUEUED    RECVD     SENT", curses.A_REVERSE)
+        self.addstr(1, 0, "CLIENT                          PORT S I   QUEUED    RECVD     SENT", curses.A_REVERSE)
         self.sessions[s.server_id] = s.sessions
         items = []
         for l in self.sessions:
@@ -265,8 +265,8 @@ class SessionUI(BaseUI):
             try:
                 #ugh, need to handle if slow - thread for async resolver?
                 host = self.hostname(session) if options.names else session.host
-                self.addstr(i + 2, 0, "%-15s %5s %1s %1s %8s %8s %8s" %
-                            (host[:15], session.port, session.server_id, session.interest_ops,
+                self.addstr(i + 2, 0, "%-30s %5s %1s %1s %8s %8s %8s" %
+                            (host[:30], session.port, session.server_id, session.interest_ops,
                              session.queued, session.recved, session.sent))
             except:
                 break
