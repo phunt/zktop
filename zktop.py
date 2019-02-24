@@ -53,6 +53,9 @@ parser.add_option("-n", "--names",
 parser.add_option("", "--fix_330",
                   action="store_true", dest="fix_330", default=False,
                   help="workaround for a bug in ZK 3.3.0")
+parser.add_option("-w", "--wide",
+                  action="store_true", dest="wide", default=False,
+                  help="allow output to expand beyond 80 cols")
 parser.add_option("-v", "--verbosity",
                   dest="verbosity", default="DEBUG",
                   help="log level verbosity (DEBUG, INFO, WARN(ING), ERROR, CRITICAL/FATAL)")
@@ -224,20 +227,32 @@ class SummaryUI(BaseUI):
                     (nc, zxid, sc))
 
 class ServerUI(BaseUI):
-    def __init__(self, height, width, server_count):
+    def __init__(self, height, width, server_count, wide=False):
+        self.wide = wide
         BaseUI.__init__(self, curses.newwin(server_count + 2, width, 1, 0))
 
     def resize(self, maxy, maxx):
         BaseUI.resize(self, maxy, maxx)
-        self.addstr(1, 0, "ID SERVER                          PORT M    OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
+        if self.wide:
+            self.addstr(1, 0, "ID SERVER                          PORT M    OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
+        else:
+            self.addstr(1, 0, "ID SERVER           PORT M    OUTST    RECVD     SENT CONNS MINLAT AVGLAT MAXLAT", curses.A_REVERSE)
 
     def update(self, s):
-        if s.unavailable:
-            self.addstr(s.server_id + 2, 0, "%-2s %-30s %5s %s" %
-                        (s.server_id, s.host[:30], s.port, s.mode[:1].upper()))
+        if self.wide:
+            host_width = 30
+            unavailable_format = "%-2s %-30s %5s %s"
+            available_format = "%-2s %-30s %5s %s %8s %8s %8s %5d %6s %6s %6s"
         else:
-            self.addstr(s.server_id + 2, 0, "%-2s %-30s %5s %s %8s %8s %8s %5d %6s %6s %6s" %
-                        (s.server_id, s.host[:30], s.port, s.mode[:1].upper(),
+            host_width = 15
+            unavailable_format = "%-2s %-15s %5s %s"
+            available_format = "%-2s %-15s %5s %s %8s %8s %8s %5d %6s %6s %6s"
+        if s.unavailable:
+            self.addstr(s.server_id + 2, 0, unavailable_format %
+                        (s.server_id, s.host[:host_width], s.port, s.mode[:1].upper()))
+        else:
+            self.addstr(s.server_id + 2, 0, available_format %
+                        (s.server_id, s.host[:host_width], s.port, s.mode[:1].upper(),
                          s.outstanding, s.received, s.sent, len(s.sessions),
                          s.min_latency, s.avg_latency, s.max_latency))
 
@@ -273,7 +288,8 @@ class SessionUI(BaseUI):
 
 mainwin = None
 class Main(object):
-    def __init__(self, servers):
+    def __init__(self, servers, wide_ui=False):
+        self.wide_ui = wide_ui
         self.servers = servers.split(",")
 
     def show_ui(self, stdscr):
@@ -291,7 +307,7 @@ class Main(object):
         server_count = len(self.servers)
         maxy, maxx = stdscr.getmaxyx()
         uis = (SummaryUI(maxy, maxx, server_count),
-               ServerUI(maxy, maxx, server_count),
+               ServerUI(maxy, maxx, server_count, wide=self.wide_ui),
                SessionUI(maxy, maxx, server_count))
 
         # start the polling threads
@@ -389,7 +405,7 @@ def get_zk_servers(filename):
 
 def main_func():
     LOG.debug("startup")
-    ui = Main(get_zk_servers(options.configfile))
+    ui = Main(get_zk_servers(options.configfile), wide_ui=options.wide)
     curses.wrapper(ui.show_ui)
     
 if __name__ == '__main__':
