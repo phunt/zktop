@@ -8,6 +8,14 @@ h2. Summary
 
 h3. Example
 
+Prereq:
+
+Ensure zoo.cg on all nodes whitelists the minimum "four letter words":https://zookeeper.apache.org/doc/r3.3.3/zookeeperAdmin.html#sc_zkCommands for zktop to work:
+
+<pre>
+4lw.commands.whitelist=stat,srst
+</pre>
+
 Running:
 
 <pre>
